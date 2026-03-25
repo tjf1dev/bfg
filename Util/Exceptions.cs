@@ -1,8 +1,16 @@
-public class BFExecutionException : Exception
+public class ExecutionException : Exception
 {
     public int StepsTaken { get; }
-    public BFExecutionException(string message, int steps) : base(message)
+    public ExecutionException(string message, int steps) : base(message)
     {
         StepsTaken = steps;
+    }
+}
+public class InvalidInstruction : Exception
+{
+    public char Instruction { get; }
+    public InvalidInstruction(string message, char instruction) : base(message)
+    {
+        Instruction = instruction;
     }
 }

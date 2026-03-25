@@ -20,23 +20,33 @@ bfg supports comments prefixed with `#`
 ```
 
 ## syntax
-`bfg <file> [--show-memory | --meta | --num | --max-steps]`  
+```
+USAGE:
+    bfg <file> [OPTIONS] [COMMAND]
 
-`file`: the file to run  
-`--show-memory`: whether to show the modified cells after execution  
-`--meta` (or `-m`): whether to show time and steps after execution  
-`--num` (or `-n`): whether to output numbers instead of letters  
-`--max-steps`: the amount of steps a program can do before throwing an error (defaults to `-1 (infinite)`)
+ARGUMENTS:
+    <file>    The file to run
 
+OPTIONS:
+                                         DEFAULT                                                                                
+    -h, --help                                      Prints help information                                                     
+        --show-memory                               Show the memory after execution                                             
+    -m, --meta                                      Show elapsed time and step count after execution                            
+    -n, --num                                       If true, displays output as numbers instead of letters                      
+    -q, --quiet                                     If true, does not show any messages other than the output                   
+        --max-steps                      -1         The max amount of steps the program can use. Use 0 for infinite             
+        --ignore-invalid-instructions                                                                                           
+        --no-stream                                 Wait for the full program to finish, then prints the output                 
+        --delay                          0          Delay after outputting a character in miliseconds. Only works when streaming
+
+COMMANDS:
+    run <file>          Run a file      
+    visualize <file>    Visualize a file
+    string <string>       
+```
 # download
-download an executable from the [Releases](/tjf1dev/bfg/releases) page.
-### windows
-download the `bfg.exe` file, then run it in the terminal (like `bfg.exe examples/helloworld.bf`)
-### linux
-download the `bfg` (without .exe) then run it in the terminal (like `bfg examples/helloworld.bf`)
-
-### other
-i didnt try any other platforms so build it yourself ig 😭
+download an executable from the [Releases](/tjf1dev/bfg/releases) page.  
+on windows, you will have to run it in the terminal - just running the .exe won't work
 
 # build
 install the .NET SDK first
