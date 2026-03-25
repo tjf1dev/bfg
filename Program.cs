@@ -2,13 +2,25 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Net.Mime;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Spectre.Console;
+
 
 class BFG
 {
     static int Main(string[] args)
     {
+
+        var assembly = Assembly.GetExecutingAssembly();
+        using var stream = assembly.GetManifestResourceStream("bfg.VERSION");
+        using var reader = new StreamReader(stream!);
+        var version = reader.ReadToEnd().Trim();
+        if (args.Contains("-v") || args.Contains("--version"))
+        {
+            Console.WriteLine($"bfg v{version}");
+            return 0;
+        }
         RootCommand rootCommand = new("Simple Brainfuck parser.");
         Argument<FileInfo> file = new("file")
         {
