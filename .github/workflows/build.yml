@@ -1,5 +1,4 @@
 name: build
-
 on:
   push:
     branches: ["main"]
@@ -26,11 +25,14 @@ jobs:
           - os: macos-latest
             rid: osx-arm64
             bin: bfg-osx-arm64
-
     runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: read version
+        id: version
+        shell: bash
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
 
       - name: setup .net
         uses: actions/setup-dotnet@v4
@@ -45,17 +47,48 @@ jobs:
         run: dotnet publish -r ${{ matrix.rid }} -c Release -p:PublishAot=true -o ./publish
 
       - name: rename binary
+        id: rename
         shell: bash
         run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BASE="${{ matrix.bin }}"
           if [ "${{ runner.os }}" == "Windows" ]; then
-            mv ./publish/*.exe ./publish/${{ matrix.bin }}
+            VERSIONED="${BASE%.exe}-v${VERSION}.exe"
+            mv ./publish/*.exe "./publish/$VERSIONED"
           else
-            # Finds the binary (ignoring .pdb or .dbg files) and renames it
-            mv $(find ./publish -maxdepth 1 -type f ! -name "*.*") ./publish/${{ matrix.bin }}
+            VERSIONED="${BASE}-v${VERSION}"
+            mv $(find ./publish -maxdepth 1 -type f ! -name "*.*") "./publish/$VERSIONED"
           fi
+          echo "filename=$VERSIONED" >> $GITHUB_OUTPUT
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.bin }}
-          path: ./publish/${{ matrix.bin }}
+          name: ${{ steps.rename.outputs.filename }}
+          path: ./publish/${{ steps.rename.outputs.filename }}
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: read version
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: ./artifacts/*
