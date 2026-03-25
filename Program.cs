@@ -29,16 +29,23 @@ class BFG
             Description = "If true, displays output as numbers instead of letters",
             DefaultValueFactory = c => false
         };
+        Option<bool> quiet = new("--quiet", "-q")
+        {
+            Description = "If true, does not show any messages other than the output.",
+            DefaultValueFactory = c => false
+        };
         Option<long> maxStepsOption = new("--max-steps", "-s")
         {
             Description = "The max amount of steps the program can use. use 0 for infinite",
             DefaultValueFactory = c => -1L
         };
 
+
         rootCommand.Arguments.Add(file);
         rootCommand.Options.Add(showMemoryOption);
         rootCommand.Options.Add(showMeta);
         rootCommand.Options.Add(numeric);
+        rootCommand.Options.Add(quiet);
         rootCommand.Options.Add(maxStepsOption);
 
 
@@ -58,58 +65,82 @@ class BFG
             bool error = false;
             var sw = new System.Diagnostics.Stopwatch();
             TimeSpan duration = TimeSpan.Zero;
-            AnsiConsole.Status().Start("Executing...", ctx =>
+            bool isQuiet = parseResult.GetValue(quiet);
+            if (!isQuiet)
+            {
+                AnsiConsole.Status().Start("Executing...", ctx =>
+                       {
+                           string content = File.ReadAllText(parsedFile.FullName);
+                           prog.OnUpdate = updateType =>
+                           {
+                               switch (updateType)
+                               {
+                                   case UpdateType.Default:
+                                       ctx.Status("Executing...");
+                                       break;
+                                   case UpdateType.WaitingForInput:
+                                       if (meta)
+                                       {
+                                           ctx.Status($"Waiting for input in cell {prog.cell}");
+                                       }
+                                       else
+                                       {
+                                           ctx.Status("Waiting for input");
+                                       }
+                                       ctx.Spinner(Spinner.Known.Arc);
+                                       break;
+                               }
+                           };
+
+                           try
+                           {
+                               sw.Start();
+
+                               prog.Parse(content);
+                               sw.Stop();
+                           }
+                           catch (BFExecutionException)
+                           {
+                               sw.Stop();
+                               AnsiConsole.MarkupLine("[red]Execution limit reached.[/]");
+                               error = true;
+                           }
+                           finally
+                           {
+                               duration = sw.Elapsed;
+                           }
+                       });
+            }
+            else
             {
                 string content = File.ReadAllText(parsedFile.FullName);
-                prog.OnUpdate = updateType =>
-                {
-                    switch (updateType)
-                    {
-                        case UpdateType.Default:
-                            ctx.Status("Executing...");
-                            break;
-                        case UpdateType.WaitingForInput:
-                            if (meta)
-                            {
-                                ctx.Status($"Waiting for input in cell {prog.cell}");
-                            }
-                            else
-                            {
-                                ctx.Status("Waiting for input");
-                            }
-                            ctx.Spinner(Spinner.Known.Arc);
-                            break;
-                    }
-                };
-
                 try
                 {
                     sw.Start();
-
                     prog.Parse(content);
                     sw.Stop();
                 }
                 catch (BFExecutionException)
                 {
                     sw.Stop();
-                    AnsiConsole.MarkupLine("[red]Execution limit reached.[/]");
                     error = true;
                 }
                 finally
                 {
                     duration = sw.Elapsed;
                 }
-            });
+            }
 
             AnsiConsole.WriteLine(prog.GetOutput());
 
             if (error)
             {
-                if (meta) AnsiConsole.MarkupLine($"[grey]took {duration.TotalMilliseconds:N2}ms and {prog.steps} steps[/]");
+                if (!isQuiet) AnsiConsole.MarkupLine("[red]Execution limit reached.[/]");
+                if (meta && !isQuiet) AnsiConsole.MarkupLine($"[grey]took {duration.TotalMilliseconds:N2}ms and {prog.steps} steps[/]");
                 return 1;
             }
-            if (parseResult.GetValue(showMemoryOption) is true) AnsiConsole.WriteLine(prog.GetActiveMemory());
-            if (meta) AnsiConsole.MarkupLine($"[grey]took {duration.TotalMilliseconds:N2}ms and {prog.steps} steps[/]");
+            if (parseResult.GetValue(showMemoryOption) is true && !isQuiet) AnsiConsole.WriteLine(prog.GetActiveMemory());
+            if (meta && !isQuiet) AnsiConsole.MarkupLine($"[grey]took {duration.TotalMilliseconds:N2}ms and {prog.steps} steps[/]");
             return 0;
         }
         foreach (ParseError parseError in parseResult.Errors)
