@@ -1,7 +1,7 @@
 # bfg
 a silly brainfuck interpreter i made in c#
 
-> ![WARNING]
+> [!WARNING]
 > as always, this may not work at all, please report any issues ;)
  
 # how it works
