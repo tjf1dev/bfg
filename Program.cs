@@ -142,7 +142,7 @@ public class Bfg
                     {
                         ctx.Spinner(new EmptySpinner());
                         output += s;
-                        ctx.Status(output);
+                        ctx.Status(Markup.Escape(output));
                         if (delay > 0)
                             Thread.Sleep(delay);
                     };
