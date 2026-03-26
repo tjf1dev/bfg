@@ -11,7 +11,7 @@ available as an [AUR package](https://aur.archlinux.org/packages/bfg-bin)
 yay -S bfg-bin
 ```
 ### other
-download an executable from the [Releases](/tjf1dev/bfg/releases) page.  
+download an executable from the [Releases](https://github.com/tjf1dev/bfg/releases/latest) page.  
 on windows, you will have to run it in the terminal - just running the .exe won't work
 
 # how it works
