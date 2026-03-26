@@ -1,88 +1,106 @@
-﻿using System.ComponentModel;
+﻿using System.CommandLine;
 using System.Reflection;
-using System.Text;
-using System.Xml;
 using Spectre.Console;
-using Spectre.Console.Cli;
 
-var assembly = Assembly.GetExecutingAssembly();
-using var stream = assembly.GetManifestResourceStream("bfg.VERSION");
-using var reader = new StreamReader(stream!);
-var version = reader.ReadToEnd().Trim();
-
-if (args.Contains("-v") || args.Contains("--version"))
+public class Bfg
 {
-    Console.WriteLine($"bfg v{version}");
-    return 0;
-}
-
-var app = new CommandApp();
-app.Configure(config =>
-{
-    config.AddCommand<RunCommand>("run")
-        .WithDescription("Run a file.");
-
-    config.AddCommand<VisualizeCommand>("visualize")
-        .WithDescription("Visualize a file.");
-    config.AddCommand<StringCommand>("string");
-});
-app.SetDefaultCommand<RunCommand>();
-
-return app.Run(args);
-
-
-
-
-public sealed class RunCommand : Command<RunCommand.Settings>
-{
-    public sealed class Settings : CommandSettings
+    public static async Task<int> Main(string[] args)
     {
-        [CommandArgument(0, "<file>")]
-        [Description("The file to run")]
-        public string File { get; set; } = "";
+        var assembly = Assembly.GetExecutingAssembly();
+        using var stream = assembly.GetManifestResourceStream("bfg.VERSION");
+        using var reader = new StreamReader(stream!);
+        var version = reader.ReadToEnd().Trim();
 
-        [CommandOption("--show-memory")]
-        [Description("Show the memory after execution")]
-        [DefaultValue(false)]
-        public bool ShowMemory { get; set; }
+        if (args.Contains("-v") || args.Contains("--version"))
+        {
+            Console.WriteLine($"bfg v{version}");
+            return 0;
+        }
 
-        [CommandOption("-m|--meta")]
-        [Description("Show elapsed time and step count after execution.")]
-        [DefaultValue(false)]
-        public bool Meta { get; set; }
+        var fileArg = new Argument<FileInfo>("file") { Description = "The file to run" };
+        var showMemoryOpt = new Option<bool>("--show-memory") { Description = "Show the memory after execution" };
+        var metaOpt = new Option<bool>("--meta") { Description = "Show elapsed time and step count after execution." };
+        metaOpt.Aliases.Add("-m");
+        var numericOpt = new Option<bool>("--num") { Description = "If true, displays output as numbers instead of letters" };
+        numericOpt.Aliases.Add("-n");
+        var quietOpt = new Option<bool>("--quiet") { Description = "If true, does not show any messages other than the output." };
+        quietOpt.Aliases.Add("-q");
+        var maxStepsOpt = new Option<long>("--max-steps") { Description = "The max amount of steps the program can use. Use 0 for infinite", DefaultValueFactory = _ => -1L };
+        var ignoreInvalidOpt = new Option<bool>("--ignore-invalid-instructions");
+        var noStreamOpt = new Option<bool>("--no-stream") { Description = "Wait for the full program to finish, then prints the output.", DefaultValueFactory = _ => false };
+        var delayOpt = new Option<int>("--delay") { Description = "Delay after outputting a character in miliseconds. Only works when streaming", DefaultValueFactory = _ => 0 };
 
-        [CommandOption("-n|--num")]
-        [Description("If true, displays output as numbers instead of letters")]
-        [DefaultValue(false)]
-        public bool Numeric { get; set; }
+        var runCommand = new Command("run", "Run a file.");
+        runCommand.Arguments.Add(fileArg);
+        runCommand.Options.Add(showMemoryOpt);
+        runCommand.Options.Add(metaOpt);
+        runCommand.Options.Add(numericOpt);
+        runCommand.Options.Add(quietOpt);
+        runCommand.Options.Add(maxStepsOpt);
+        runCommand.Options.Add(ignoreInvalidOpt);
+        runCommand.Options.Add(noStreamOpt);
+        runCommand.Options.Add(delayOpt);
+        runCommand.SetAction(result => RunFile(
+            result.GetValue(fileArg)!,
+            result.GetValue(showMemoryOpt),
+            result.GetValue(metaOpt),
+            result.GetValue(numericOpt),
+            result.GetValue(quietOpt),
+            result.GetValue(maxStepsOpt),
+            result.GetValue(ignoreInvalidOpt),
+            result.GetValue(noStreamOpt),
+            result.GetValue(delayOpt)
+        ));
 
-        [CommandOption("-q|--quiet")]
-        [Description("If true, does not show any messages other than the output.")]
-        [DefaultValue(false)]
-        public bool Quiet { get; set; }
+        var vizFileArg = new Argument<FileInfo>("file") { Description = "The file to visualize" };
+        var visualizeCommand = new Command("visualize", "Visualize a file.");
+        visualizeCommand.Arguments.Add(vizFileArg);
+        visualizeCommand.SetAction(_ =>
+        {
+            AnsiConsole.MarkupLine("[yellow]Visualize is not yet implemented.[/]");
+        });
 
-        [CommandOption("--max-steps")]
-        [Description("The max amount of steps the program can use. Use 0 for infinite")]
-        [DefaultValue(-1L)]
-        public long MaxSteps { get; set; }
+        var stringArg = new Argument<string[]>("string") { Description = "The string to convert to brainfuck", Arity = ArgumentArity.OneOrMore };
+        var outputOpt = new Option<FileInfo?>("--output") { Description = "The file that the output gets printed to" };
+        outputOpt.Aliases.Add("-o");
+        var stringCommand = new Command("string");
+        stringCommand.Arguments.Add(stringArg);
+        stringCommand.Options.Add(outputOpt);
+        stringCommand.SetAction(result => RunString(
+            result.GetValue(stringArg)!,
+            result.GetValue(outputOpt)
+        ));
 
-        [CommandOption("--ignore-invalid-instructions")]
-        [DefaultValue(false)]
-        public bool IgnoreInvalidInstructions { get; set; }
+        var rootCommand = new RootCommand();
+        rootCommand.Subcommands.Add(runCommand);
+        rootCommand.Subcommands.Add(visualizeCommand);
+        rootCommand.Subcommands.Add(stringCommand);
+        rootCommand.Arguments.Add(fileArg);
+        rootCommand.Options.Add(showMemoryOpt);
+        rootCommand.Options.Add(metaOpt);
+        rootCommand.Options.Add(numericOpt);
+        rootCommand.Options.Add(quietOpt);
+        rootCommand.Options.Add(maxStepsOpt);
+        rootCommand.Options.Add(ignoreInvalidOpt);
+        rootCommand.Options.Add(noStreamOpt);
+        rootCommand.Options.Add(delayOpt);
+        rootCommand.SetAction(result => RunFile(
+            result.GetValue(fileArg)!,
+            result.GetValue(showMemoryOpt),
+            result.GetValue(metaOpt),
+            result.GetValue(numericOpt),
+            result.GetValue(quietOpt),
+            result.GetValue(maxStepsOpt),
+            result.GetValue(ignoreInvalidOpt),
+            result.GetValue(noStreamOpt),
+            result.GetValue(delayOpt)
+        ));
 
-        [CommandOption("--no-stream")]
-        [Description("Wait for the full program to finish, then prints the output.")]
-        [DefaultValue(false)]
-        public bool NoStream { get; set; }
-
-        [CommandOption("--delay")]
-        [Description("Delay after outputting a character in miliseconds. Only works when streaming")]
-        [DefaultValue(0)]
-        public int Delay { get; set; }
+        return await rootCommand.Parse(args).InvokeAsync();
     }
-    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
+
+    private static int RunFile(FileInfo fileInfo, bool showMemory, bool meta, bool numeric, bool quiet, long maxSteps, bool ignoreInvalid, bool noStream, int delay)
     {
-        var fileInfo = new FileInfo(settings.File);
         if (!fileInfo.Exists)
         {
             AnsiConsole.MarkupLine($"[red]File \"{fileInfo.Name}\" could not be found.[/]");
@@ -90,18 +108,19 @@ public sealed class RunCommand : Command<RunCommand.Settings>
         }
 
         var prog = new BFProgram();
-        prog.maxSteps = settings.MaxSteps;
-        prog.useNumbers = settings.Numeric;
-        prog.ignoreInvalidInstructions = settings.IgnoreInvalidInstructions;
+        prog.maxSteps = maxSteps;
+        prog.useNumbers = numeric;
+        prog.ignoreInvalidInstructions = ignoreInvalid;
 
         bool error = false;
         string content = File.ReadAllText(fileInfo.FullName);
         var sw = new System.Diagnostics.Stopwatch();
 
-        if (!settings.Quiet)
+        if (!quiet)
         {
             AnsiConsole.Status().Start("Executing...", ctx =>
             {
+                ctx.Spinner(Spinner.Known.Default);
                 prog.OnUpdate = updateType =>
                 {
                     switch (updateType)
@@ -110,21 +129,22 @@ public sealed class RunCommand : Command<RunCommand.Settings>
                             ctx.Status("Executing...");
                             break;
                         case UpdateType.WaitingForInput:
-                            ctx.Status(settings.Meta ? $"Waiting for input in cell {prog.cell}" : "Waiting for input");
+                            ctx.Status(meta ? $"Waiting for input in cell {prog.cell}" : "Waiting for input");
                             ctx.Spinner(Spinner.Known.Arc);
                             break;
                     }
                 };
-                if (!settings.NoStream)
+
+                if (!noStream)
                 {
                     string output = "";
-                    ctx.Spinner(new EmptySpinner());
                     prog.OnOutput = s =>
                     {
+                        ctx.Spinner(new EmptySpinner());
                         output += s;
                         ctx.Status(output);
-                        if (settings.Delay > 0)
-                            Thread.Sleep(settings.Delay);
+                        if (delay > 0)
+                            Thread.Sleep(delay);
                     };
                 }
 
@@ -153,13 +173,13 @@ public sealed class RunCommand : Command<RunCommand.Settings>
             try
             {
                 sw.Start();
-                if (!settings.NoStream)
+                if (!noStream)
                 {
                     prog.OnOutput = s =>
                     {
                         AnsiConsole.Write(s);
-                        if (settings.Delay > 0)
-                            Thread.Sleep(settings.Delay);
+                        if (delay > 0)
+                            Thread.Sleep(delay);
                     };
                 }
                 prog.Parse(content);
@@ -180,54 +200,19 @@ public sealed class RunCommand : Command<RunCommand.Settings>
         if (!error)
         {
             AnsiConsole.WriteLine(prog.GetOutput());
-
-            if (settings.ShowMemory && !settings.Quiet)
+            if (showMemory && !quiet)
                 AnsiConsole.WriteLine(prog.GetActiveMemory());
         }
 
-        if (settings.Meta && !settings.Quiet)
+        if (meta && !quiet)
             AnsiConsole.MarkupLine($"[grey]took {sw.Elapsed.TotalMilliseconds:N2}ms and {prog.steps} steps[/]");
 
         return error ? 1 : 0;
     }
-}
 
-
-
-
-public sealed class VisualizeCommand : Command<VisualizeCommand.Settings>
-{
-    public sealed class Settings : CommandSettings
+    private static int RunString(string[] strings, FileInfo? output)
     {
-        [CommandArgument(0, "<file>")]
-        [Description("The file to visualize")]
-        public string File { get; set; } = "";
-    }
-    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
-    {
-        AnsiConsole.MarkupLine("[yellow]Visualize is not yet implemented.[/]");
-        return 0;
-    }
-}
-public sealed class StringCommand : Command<StringCommand.Settings>
-{
-    public sealed class Settings : CommandSettings
-    {
-        [CommandArgument(0, "<string>")]
-        [Description("The string to convert to brainfuck")]
-        public string[] String { get; set; } = Array.Empty<string>();
-
-        [CommandOption("-o|--output")]
-        [Description("The file that the output gets printed to")]
-        [DefaultValue(null)]
-        public FileInfo? Output { get; set; }
-
-
-    }
-    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
-    {
-        string bf = StringToBf.GenerateBf(string.Join(" ", settings.String));
-        FileInfo? output = settings.Output;
+        string bf = StringToBf.GenerateBf(string.Join(" ", strings));
 
         if (output is null)
         {
@@ -244,8 +229,8 @@ public sealed class StringCommand : Command<StringCommand.Settings>
             }
         }
 
-        using (var stream = output.Open(FileMode.Create, FileAccess.Write))
-        using (var writer = new StreamWriter(stream))
+        using (var fs = output.Open(FileMode.Create, FileAccess.Write))
+        using (var writer = new StreamWriter(fs))
         {
             writer.Write(bf);
         }
